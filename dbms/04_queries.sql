@@ -1,206 +1,128 @@
--- dbms/04_queries.sql
--- UniCrate: every query the application uses, expressed as SQL.
--- Each query is marked -- READ or -- WRITE.
--- "?" marks a value supplied by the app (parameterized, never string-built).
---
--- Table shapes (relational form of prisma/schema.prisma):
---   users   (id, name, email UNIQUE, password, registration_number, role,
---            created_at, updated_at)
---   parcels (id, tracking_id UNIQUE, student_name, student_registration_number,
---            student_email, courier_name, description, arrival_date, status,
---            collected_at, created_at, updated_at,
---            registered_by_id -> users.id, collected_by_id -> users.id)
---
--- Indexes the queries rely on:
---   users(email) UNIQUE, users(registration_number),
---   parcels(tracking_id) UNIQUE, parcels(student_registration_number),
---   parcels(status)
+-- =========================================================
+-- UniCrate Parcel Management Database
+-- File: dbms/04_queries.sql
+-- Purpose: Application query catalogue
+-- Note: PostgreSQL academic representation; runtime uses Prisma
+-- READ = retrieval; WRITE = insert, update, or delete
+-- Named placeholders (e.g. :email) are supplied by the API
+-- =========================================================
 
 
-/* =====================================================================
-   AUTH  (authController.js, authMiddleware.js, authRoutes.js)
-   ===================================================================== */
+-- =========================================================
+-- 1. AUTHENTICATION / USER MANAGEMENT
+-- =========================================================
 
--- Q1: Count users (first-ADMIN check in registerGate and register)
--- READ
-SELECT COUNT(*) AS user_count
-FROM users;
-
--- Q2: Find user by email (login; duplicate-email check on register)
--- READ
+-- READ: Find an account by email during login.
+-- The application compares the submitted password using bcrypt.
 SELECT id, name, email, password, registration_number, role
 FROM users
-WHERE email = ?;
+WHERE LOWER(email) = LOWER(:email);
 
--- Q3: Find user by registration number (duplicate check on register)
--- READ
+
+-- READ: Get the authenticated user's profile.
+-- Do not return the password field in the API response.
+SELECT id, name, email, registration_number, role, created_at, updated_at
+FROM users
+WHERE id = :authenticated_user_id;
+
+
+-- READ: Check whether an email is already registered.
 SELECT id
 FROM users
-WHERE registration_number = ?
-LIMIT 1;
+WHERE LOWER(email) = LOWER(:email);
 
--- Q4: Load logged-in user by id, password excluded (authMiddleware protect)
--- READ
-SELECT id, name, email, registration_number, role
+
+-- READ: Check registration-number duplicates in application logic.
+-- The database index is not a UNIQUE constraint.
+SELECT id
 FROM users
-WHERE id = ?;
-
--- Q5: Create a user (register)
--- WRITE
-INSERT INTO users (name, email, password, registration_number, role, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, NOW(), NOW());
+WHERE UPPER(TRIM(registration_number)) = UPPER(TRIM(:registration_number));
 
 
-/* =====================================================================
-   PARCELS  (parcelController.js)
-   ===================================================================== */
-
--- Q6: Register a parcel (createParcel)
--- WRITE
-INSERT INTO parcels (
-  tracking_id, student_name, student_registration_number, student_email,
-  courier_name, description, arrival_date, status,
-  registered_by_id, created_at, updated_at
+-- WRITE: Create a user.
+-- Hash the password and validate role permissions in the controller.
+INSERT INTO users (
+    id, name, email, password, registration_number, role
 )
-VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, NOW()), 'PENDING', ?, NOW(), NOW());
+VALUES (
+    :object_id,
+    :name,
+    LOWER(:email),
+    :bcrypt_hash,
+    NULLIF(UPPER(TRIM(:registration_number)), ''),
+    :role
+)
+RETURNING id, name, email, registration_number, role, created_at;
 
--- Q7: List all parcels with search and status filter, staff view (getParcels)
---     JOINs bring in who registered and who collected each parcel.
---     Optional filters: pass NULL to skip status or search.
--- READ
-SELECT p.id, p.tracking_id, p.student_name, p.student_registration_number,
-       p.student_email, p.courier_name, p.description, p.arrival_date,
-       p.status, p.collected_at, p.created_at,
-       rb.id   AS registered_by_id,   rb.name AS registered_by_name,
-       cb.id   AS collected_by_id,    cb.name AS collected_by_name
+
+-- READ: List users for an authorized administrator.
+SELECT id, name, email, registration_number, role, created_at
+FROM users
+ORDER BY created_at DESC;
+
+
+-- =========================================================
+-- 2. PARCEL REGISTRATION / LISTING / DETAILS
+-- =========================================================
+
+-- WRITE: Register an incoming parcel.
+-- Student and courier details are stored directly on the parcel.
+INSERT INTO parcels (
+    id,
+    tracking_id,
+    student_name,
+    student_registration_number,
+    student_email,
+    courier_name,
+    description,
+    arrival_date,
+    status,
+    registered_by_id
+)
+VALUES (
+    :object_id,
+    :tracking_id,
+    :student_name,
+    UPPER(TRIM(:student_registration_number)),
+    LOWER(:student_email),
+    :courier_name,
+    :description,
+    COALESCE(:arrival_date, CURRENT_TIMESTAMP),
+    'PENDING',
+    :authenticated_staff_user_id
+)
+RETURNING *;
+
+
+-- READ: List all parcels for authorized staff.
+-- Join users twice to get the registering and collecting staff names.
+SELECT
+    p.*,
+    registrar.name AS registered_by_name,
+    collector.name AS collected_by_name
 FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-WHERE (? IS NULL OR p.status = ?)
-  AND (? IS NULL
-       OR LOWER(p.tracking_id)                  LIKE LOWER(CONCAT('%', ?, '%'))
-       OR LOWER(p.student_name)                 LIKE LOWER(CONCAT('%', ?, '%'))
-       OR LOWER(p.student_registration_number)  LIKE LOWER(CONCAT('%', ?, '%')))
-ORDER BY p.created_at DESC;
+JOIN users registrar
+    ON registrar.id = p.registered_by_id
+LEFT JOIN users collector
+    ON collector.id = p.collected_by_id
+ORDER BY p.arrival_date DESC;
 
--- Q8: List parcels, student (VIEWER) view. The registration number comes from
---     the logged-in user's record, never from the request (privacy rule).
--- READ
-SELECT p.id, p.tracking_id, p.student_name, p.student_registration_number,
-       p.student_email, p.courier_name, p.description, p.arrival_date,
-       p.status, p.collected_at, p.created_at,
-       rb.id   AS registered_by_id,   rb.name AS registered_by_name,
-       cb.id   AS collected_by_id,    cb.name AS collected_by_name
-FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-WHERE p.student_registration_number = ?          -- req.user.registrationNumber
-  AND (? IS NULL OR p.status = ?)
-  AND (? IS NULL
-       OR LOWER(p.tracking_id)  LIKE LOWER(CONCAT('%', ?, '%'))
-       OR LOWER(p.student_name) LIKE LOWER(CONCAT('%', ?, '%')))
-ORDER BY p.created_at DESC;
 
--- Q9: Get one parcel by id, staff (getParcelById)
--- READ
-SELECT p.*,
-       rb.name AS registered_by_name, rb.email AS registered_by_email,
-       cb.name AS collected_by_name,  cb.email AS collected_by_email
-FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-WHERE p.id = ?;
-
--- Q10: Get one parcel by id, student. A parcel that belongs to someone else
---      returns no row, so the app answers 404 and hides that it exists.
--- READ
-SELECT p.*,
-       rb.name AS registered_by_name, rb.email AS registered_by_email,
-       cb.name AS collected_by_name,  cb.email AS collected_by_email
-FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-WHERE p.id = ?
-  AND p.student_registration_number = ?;         -- req.user.registrationNumber
-
--- Q11: Check a parcel exists and read its status (updateParcel, collectParcel,
---      deleteParcel all run this before changing anything)
--- READ
-SELECT id, status
+-- READ: List parcels belonging to the authenticated student.
+-- The registration number must come from the authenticated user,
+-- not from an untrusted client-supplied value.
+SELECT
+    id, tracking_id, student_name, student_registration_number,
+    student_email, courier_name, description, arrival_date,
+    status, collected_at
 FROM parcels
-WHERE id = ?;
-
--- Q12: Update editable parcel fields (updateParcel).
---      Only fields sent by the client are changed; status, tracking_id and
---      collection details are never touched here.
--- WRITE
-UPDATE parcels
-SET student_name                = COALESCE(?, student_name),
-    student_registration_number = COALESCE(?, student_registration_number),
-    student_email               = COALESCE(?, student_email),
-    courier_name                = COALESCE(?, courier_name),
-    description                 = ?,
-    arrival_date                = COALESCE(?, arrival_date),
-    updated_at                  = NOW()
-WHERE id = ?;
-
--- Q13: Mark a parcel collected (collectParcel). The status guard makes a
---      second collect update 0 rows, which the app reports as 409.
--- WRITE
-UPDATE parcels
-SET status          = 'COLLECTED',
-    collected_at    = NOW(),
-    collected_by_id = ?,                         -- req.user.id
-    updated_at      = NOW()
-WHERE id = ?
-  AND status = 'PENDING';
-
--- Q14: Delete a parcel, ADMIN only (deleteParcel)
--- WRITE
-DELETE FROM parcels
-WHERE id = ?;
+WHERE student_registration_number = :authenticated_user_registration_number
+ORDER BY arrival_date DESC;
 
 
-/* =====================================================================
-   DASHBOARD  (getParcelStats)
-   ===================================================================== */
-
--- Q15: Dashboard counts, staff. One pass over the table instead of three.
--- READ
-SELECT COUNT(*)                                          AS total,
-       COALESCE(SUM(CASE WHEN status = 'PENDING'   THEN 1 ELSE 0 END), 0) AS pending,
-       COALESCE(SUM(CASE WHEN status = 'COLLECTED' THEN 1 ELSE 0 END), 0) AS collected
-FROM parcels;
-
--- Q16: Dashboard counts, student (own parcels only)
--- READ
-SELECT COUNT(*)                                          AS total,
-       COALESCE(SUM(CASE WHEN status = 'PENDING'   THEN 1 ELSE 0 END), 0) AS pending,
-       COALESCE(SUM(CASE WHEN status = 'COLLECTED' THEN 1 ELSE 0 END), 0) AS collected
-FROM parcels
-WHERE student_registration_number = ?;
-
--- Q17: Five most recent parcels for the dashboard, staff
--- READ
-SELECT p.id, p.tracking_id, p.student_name, p.student_registration_number,
-       p.courier_name, p.status, p.created_at,
-       rb.name AS registered_by_name,
-       cb.name AS collected_by_name
-FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-ORDER BY p.created_at DESC
-LIMIT 5;
-
--- Q18: Five most recent parcels for the dashboard, student
--- READ
-SELECT p.id, p.tracking_id, p.student_name, p.student_registration_number,
-       p.courier_name, p.status, p.created_at,
-       rb.name AS registered_by_name,
-       cb.name AS collected_by_name
-FROM parcels p
-JOIN users rb       ON rb.id = p.registered_by_id
-LEFT JOIN users cb  ON cb.id = p.collected_by_id
-WHERE p.student_registration_number = ?
-ORDER BY p.created_at DESC
-LIMIT 5;
+-- READ: Get one parcel by ID.
+-- If the requester is a VIEWER, the application must additionally
+-- restrict the result to that user's registration number.
+SELECT
+    p.*,
+    registrar.name AS registered_by_name,
