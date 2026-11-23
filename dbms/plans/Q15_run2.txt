@@ -1,0 +1,12 @@
+                                                                     QUERY PLAN                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=1551.51..1551.52 rows=1 width=24) (actual time=8.669..8.670 rows=1.00 loops=1)
+   Buffers: shared hit=46
+   ->  Index Only Scan using idx_parcels_status on parcels  (cost=0.29..925.95 rows=50045 width=8) (actual time=0.007..3.617 rows=50000.00 loops=1)
+         Heap Fetches: 82
+         Index Searches: 1
+         Buffers: shared hit=46
+ Planning Time: 0.039 ms
+ Execution Time: 8.680 ms
+(8 rows)
+

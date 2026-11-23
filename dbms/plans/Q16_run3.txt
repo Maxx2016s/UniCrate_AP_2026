@@ -1,0 +1,16 @@
+                                                                        QUERY PLAN                                                                         
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=180.22..180.23 rows=1 width=24) (actual time=0.019..0.019 rows=1.00 loops=1)
+   Buffers: shared hit=57
+   ->  Bitmap Heap Scan on parcels  (cost=4.70..179.55 rows=53 width=8) (actual time=0.007..0.015 rows=53.00 loops=1)
+         Recheck Cond: ((student_registration_number)::text = 'REG000002'::text)
+         Heap Blocks: exact=55
+         Buffers: shared hit=57
+         ->  Bitmap Index Scan on idx_parcels_student_registration_number  (cost=0.00..4.69 rows=53 width=0) (actual time=0.004..0.004 rows=65.00 loops=1)
+               Index Cond: ((student_registration_number)::text = 'REG000002'::text)
+               Index Searches: 1
+               Buffers: shared hit=2
+ Planning Time: 0.016 ms
+ Execution Time: 0.024 ms
+(12 rows)
+

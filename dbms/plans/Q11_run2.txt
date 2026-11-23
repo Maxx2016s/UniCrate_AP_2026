@@ -1,0 +1,10 @@
+                                                        QUERY PLAN                                                        
+--------------------------------------------------------------------------------------------------------------------------
+ Index Scan using parcels_pkey on parcels  (cost=0.29..8.31 rows=1 width=12) (actual time=0.002..0.003 rows=1.00 loops=1)
+   Index Cond: (id = 1)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning Time: 0.012 ms
+ Execution Time: 0.005 ms
+(6 rows)
+

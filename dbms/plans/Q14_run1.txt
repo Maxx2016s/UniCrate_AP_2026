@@ -1,0 +1,14 @@
+BEGIN
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Delete on parcels  (cost=0.29..8.31 rows=0 width=0) (actual time=0.018..0.018 rows=0.00 loops=1)
+   Buffers: shared hit=6
+   ->  Index Scan using parcels_pkey on parcels  (cost=0.29..8.31 rows=1 width=6) (actual time=0.010..0.013 rows=1.00 loops=1)
+         Index Cond: (id = 1)
+         Index Searches: 1
+         Buffers: shared hit=5
+ Planning Time: 0.038 ms
+ Execution Time: 0.029 ms
+(8 rows)
+
+ROLLBACK

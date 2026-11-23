@@ -1,0 +1,32 @@
+                                                                QUERY PLAN                                                                 
+-------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2779.14..2779.15 rows=5 width=153) (actual time=22.794..22.796 rows=5.00 loops=1)
+   Buffers: shared hit=1142
+   ->  Sort  (cost=2779.14..2904.25 rows=50045 width=153) (actual time=22.794..22.795 rows=5.00 loops=1)
+         Sort Key: p.created_at DESC
+         Sort Method: top-N heapsort  Memory: 25kB
+         Buffers: shared hit=1142
+         ->  Hash Left Join  (cost=77.00..1947.91 rows=50045 width=153) (actual time=0.297..14.951 rows=50000.00 loops=1)
+               Hash Cond: (p.collected_by_id = cb.id)
+               Buffers: shared hit=1139
+               ->  Hash Join  (cost=38.50..1777.87 rows=50045 width=112) (actual time=0.185..11.234 rows=50000.00 loops=1)
+                     Hash Cond: (p.registered_by_id = rb.id)
+                     Buffers: shared hit=1123
+                     ->  Seq Scan on parcels p  (cost=0.00..1607.45 rows=50045 width=71) (actual time=0.002..3.892 rows=50000.00 loops=1)
+                           Buffers: shared hit=1107
+                     ->  Hash  (cost=26.00..26.00 rows=1000 width=45) (actual time=0.176..0.176 rows=1000.00 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 86kB
+                           Buffers: shared hit=16
+                           ->  Seq Scan on users rb  (cost=0.00..26.00 rows=1000 width=45) (actual time=0.003..0.094 rows=1000.00 loops=1)
+                                 Buffers: shared hit=16
+               ->  Hash  (cost=26.00..26.00 rows=1000 width=45) (actual time=0.108..0.109 rows=1000.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 86kB
+                     Buffers: shared hit=16
+                     ->  Seq Scan on users cb  (cost=0.00..26.00 rows=1000 width=45) (actual time=0.001..0.049 rows=1000.00 loops=1)
+                           Buffers: shared hit=16
+ Planning:
+   Buffers: shared hit=19
+ Planning Time: 0.107 ms
+ Execution Time: 22.814 ms
+(28 rows)
+

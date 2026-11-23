@@ -1,0 +1,42 @@
+                                                                                       QUERY PLAN                                                                                        
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=190.89..190.90 rows=5 width=153) (actual time=0.052..0.052 rows=5.00 loops=1)
+   Buffers: shared hit=63
+   ->  Sort  (cost=190.89..191.02 rows=53 width=153) (actual time=0.051..0.052 rows=5.00 loops=1)
+         Sort Key: p.created_at DESC
+         Sort Method: top-N heapsort  Memory: 25kB
+         Buffers: shared hit=63
+         ->  Merge Join  (cost=186.39..190.01 rows=53 width=153) (actual time=0.038..0.044 rows=53.00 loops=1)
+               Merge Cond: (rb.id = p.registered_by_id)
+               Buffers: shared hit=63
+               ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=3.00 loops=1)
+                     Index Searches: 1
+                     Buffers: shared hit=3
+               ->  Sort  (cost=186.11..186.25 rows=53 width=112) (actual time=0.035..0.036 rows=53.00 loops=1)
+                     Sort Key: p.registered_by_id
+                     Sort Method: quicksort  Memory: 29kB
+                     Buffers: shared hit=60
+                     ->  Merge Right Join  (cost=181.74..184.60 rows=53 width=112) (actual time=0.025..0.029 rows=53.00 loops=1)
+                           Merge Cond: (cb.id = p.collected_by_id)
+                           Buffers: shared hit=60
+                           ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=1.00 loops=1)
+                                 Index Searches: 1
+                                 Buffers: shared hit=3
+                           ->  Sort  (cost=181.07..181.20 rows=53 width=71) (actual time=0.022..0.023 rows=53.00 loops=1)
+                                 Sort Key: p.collected_by_id
+                                 Sort Method: quicksort  Memory: 29kB
+                                 Buffers: shared hit=57
+                                 ->  Bitmap Heap Scan on parcels p  (cost=4.70..179.55 rows=53 width=71) (actual time=0.007..0.018 rows=53.00 loops=1)
+                                       Recheck Cond: ((student_registration_number)::text = 'REG000002'::text)
+                                       Heap Blocks: exact=55
+                                       Buffers: shared hit=57
+                                       ->  Bitmap Index Scan on idx_parcels_student_registration_number  (cost=0.00..4.69 rows=53 width=0) (actual time=0.004..0.004 rows=65.00 loops=1)
+                                             Index Cond: ((student_registration_number)::text = 'REG000002'::text)
+                                             Index Searches: 1
+                                             Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=6
+ Planning Time: 0.083 ms
+ Execution Time: 0.060 ms
+(38 rows)
+
