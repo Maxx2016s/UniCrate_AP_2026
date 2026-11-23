@@ -1,0 +1,12 @@
+(8 rows)
+
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Index Scan using users_email_key on users  (cost=0.28..8.29 rows=1 width=70) (actual time=0.015..0.015 rows=1.00 loops=1)
+   Index Cond: ((email)::text = 'student450@unicrate.test'::text)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=18
+ Planning Time: 0.030 ms
+ Execution Time: 0.020 ms

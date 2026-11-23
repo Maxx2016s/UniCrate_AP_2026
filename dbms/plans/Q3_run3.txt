@@ -1,0 +1,12 @@
+(8 rows)
+
+                                                                  QUERY PLAN                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.28..8.29 rows=1 width=4) (actual time=0.006..0.006 rows=1.00 loops=1)
+   Buffers: shared hit=3
+   ->  Index Scan using idx_users_registration_number on users  (cost=0.28..8.29 rows=1 width=4) (actual time=0.005..0.005 rows=1.00 loops=1)
+         Index Cond: ((registration_number)::text = 'REG000500'::text)
+         Index Searches: 1
+         Buffers: shared hit=3
+ Planning Time: 0.009 ms
+ Execution Time: 0.007 ms

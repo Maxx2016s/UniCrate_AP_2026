@@ -1,0 +1,14 @@
+(6 rows)
+
+ROLLBACK
+BEGIN
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Insert on parcels  (cost=0.00..0.02 rows=0 width=0) (actual time=0.126..0.126 rows=0.00 loops=1)
+   Buffers: shared hit=74
+   ->  Result  (cost=0.00..0.02 rows=1 width=1482) (actual time=0.007..0.007 rows=1.00 loops=1)
+         Buffers: shared hit=11
+ Planning Time: 0.005 ms
+ Trigger for constraint fk_parcels_registered_by: time=0.091 calls=1
+ Trigger for constraint fk_parcels_collected_by: time=0.002 calls=1
+ Execution Time: 0.223 ms

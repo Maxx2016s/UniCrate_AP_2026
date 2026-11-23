@@ -1,0 +1,43 @@
+(8 rows)
+
+ROLLBACK
+                                                                                                          QUERY PLAN                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=2461.01..2461.04 rows=11 width=215) (actual time=14.806..14.882 rows=4134.00 loops=1)
+   Sort Key: p.created_at DESC
+   Sort Method: quicksort  Memory: 978kB
+   Buffers: shared hit=1144
+   ->  Merge Join  (cost=2457.83..2460.82 rows=11 width=215) (actual time=13.698..14.111 rows=4134.00 loops=1)
+         Merge Cond: (rb.id = p.registered_by_id)
+         Buffers: shared hit=1141
+         ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.010 rows=48.00 loops=1)
+               Index Searches: 1
+               Buffers: shared hit=3
+         ->  Sort  (cost=2457.55..2457.58 rows=11 width=174) (actual time=13.693..13.770 rows=4134.00 loops=1)
+               Sort Key: p.registered_by_id
+               Sort Method: quicksort  Memory: 825kB
+               Buffers: shared hit=1138
+               ->  Merge Right Join  (cost=2454.85..2457.36 rows=11 width=174) (actual time=12.779..13.100 rows=4134.00 loops=1)
+                     Merge Cond: (cb.id = p.collected_by_id)
+                     Buffers: shared hit=1138
+                     ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.003..0.003 rows=1.00 loops=1)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Sort  (cost=2454.18..2454.21 rows=11 width=133) (actual time=12.774..12.851 rows=4134.00 loops=1)
+                           Sort Key: p.collected_by_id
+                           Sort Method: quicksort  Memory: 825kB
+                           Buffers: shared hit=1135
+                           ->  Bitmap Heap Scan on parcels p  (cost=383.37..2453.99 rows=11 width=133) (actual time=0.451..12.215 rows=4134.00 loops=1)
+                                 Recheck Cond: ((status)::text = 'PENDING'::text)
+                                 Filter: ((lower((tracking_id)::text) ~~ '%student 5%'::text) OR (lower((student_name)::text) ~~ '%student 5%'::text) OR (lower((student_registration_number)::text) ~~ '%student 5%'::text))
+                                 Rows Removed by Filter: 30866
+                                 Heap Blocks: exact=1106
+                                 Buffers: shared hit=1135
+                                 ->  Bitmap Index Scan on idx_parcels_status  (cost=0.00..383.37 rows=35077 width=0) (actual time=0.377..0.377 rows=35005.00 loops=1)
+                                       Index Cond: ((status)::text = 'PENDING'::text)
+                                       Index Searches: 1
+                                       Buffers: shared hit=29
+ Planning:
+   Buffers: shared hit=161
+ Planning Time: 0.221 ms
+ Execution Time: 14.974 ms

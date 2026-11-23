@@ -1,0 +1,32 @@
+(38 rows)
+
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Merge Join  (cost=11.72..14.56 rows=1 width=223) (actual time=0.011..0.011 rows=1.00 loops=1)
+   Merge Cond: (rb.id = p.registered_by_id)
+   Buffers: shared hit=9
+   ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=2.00 loops=1)
+         Index Searches: 1
+         Buffers: shared hit=3
+   ->  Sort  (cost=11.45..11.45 rows=1 width=182) (actual time=0.007..0.008 rows=1.00 loops=1)
+         Sort Key: p.registered_by_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Merge Right Join  (cost=8.99..11.44 rows=1 width=182) (actual time=0.006..0.007 rows=1.00 loops=1)
+               Merge Cond: (cb.id = p.collected_by_id)
+               Buffers: shared hit=6
+               ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=1.00 loops=1)
+                     Index Searches: 1
+                     Buffers: shared hit=3
+               ->  Sort  (cost=8.32..8.32 rows=1 width=141) (actual time=0.004..0.004 rows=1.00 loops=1)
+                     Sort Key: p.collected_by_id
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=3
+                     ->  Index Scan using parcels_pkey on parcels p  (cost=0.29..8.31 rows=1 width=141) (actual time=0.004..0.004 rows=1.00 loops=1)
+                           Index Cond: (id = 500)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=9
+ Planning Time: 0.059 ms
+ Execution Time: 0.019 ms

@@ -1,0 +1,11 @@
+(8 rows)
+
+BEGIN
+                                           QUERY PLAN                                           
+------------------------------------------------------------------------------------------------
+ Insert on users  (cost=0.00..0.02 rows=0 width=0) (actual time=0.176..0.176 rows=0.00 loops=1)
+   Buffers: shared hit=39
+   ->  Result  (cost=0.00..0.02 rows=1 width=1526) (actual time=0.018..0.018 rows=1.00 loops=1)
+         Buffers: shared hit=12
+ Planning Time: 0.007 ms
+ Execution Time: 0.181 ms

@@ -1,0 +1,191 @@
+SET
+                                                  QUERY PLAN                                                   
+---------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=28.50..28.51 rows=1 width=8) (actual time=0.359..0.359 rows=1.00 loops=1)
+   Buffers: shared hit=16
+   ->  Seq Scan on users  (cost=0.00..26.00 rows=1000 width=0) (actual time=0.014..0.239 rows=1000.00 loops=1)
+         Buffers: shared hit=16
+ Planning:
+   Buffers: shared hit=98
+ Planning Time: 1.151 ms
+ Execution Time: 0.438 ms
+(8 rows)
+
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Index Scan using users_email_key on users  (cost=0.28..8.29 rows=1 width=70) (actual time=0.077..0.078 rows=1.00 loops=1)
+   Index Cond: ((email)::text = 'student450@unicrate.test'::text)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=18
+ Planning Time: 0.183 ms
+ Execution Time: 0.102 ms
+(8 rows)
+
+                                                                  QUERY PLAN                                                                  
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.28..8.29 rows=1 width=4) (actual time=0.059..0.060 rows=1.00 loops=1)
+   Buffers: shared hit=3
+   ->  Index Scan using idx_users_registration_number on users  (cost=0.28..8.29 rows=1 width=4) (actual time=0.058..0.058 rows=1.00 loops=1)
+         Index Cond: ((registration_number)::text = 'REG000500'::text)
+         Index Searches: 1
+         Buffers: shared hit=3
+ Planning Time: 0.041 ms
+ Execution Time: 0.068 ms
+(8 rows)
+
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Index Scan using users_pkey on users  (cost=0.28..8.29 rows=1 width=55) (actual time=0.027..0.028 rows=1.00 loops=1)
+   Index Cond: (id = 500)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=5
+ Planning Time: 0.065 ms
+ Execution Time: 0.038 ms
+(8 rows)
+
+BEGIN
+                                           QUERY PLAN                                           
+------------------------------------------------------------------------------------------------
+ Insert on users  (cost=0.00..0.02 rows=0 width=0) (actual time=1.246..1.247 rows=0.00 loops=1)
+   Buffers: shared hit=39
+   ->  Result  (cost=0.00..0.02 rows=1 width=1526) (actual time=0.108..0.109 rows=1.00 loops=1)
+         Buffers: shared hit=12
+ Planning Time: 0.026 ms
+ Execution Time: 1.269 ms
+(6 rows)
+
+ROLLBACK
+BEGIN
+                                            QUERY PLAN                                            
+--------------------------------------------------------------------------------------------------
+ Insert on parcels  (cost=0.00..0.02 rows=0 width=0) (actual time=0.454..0.454 rows=0.00 loops=1)
+   Buffers: shared hit=74
+   ->  Result  (cost=0.00..0.02 rows=1 width=1482) (actual time=0.029..0.029 rows=1.00 loops=1)
+         Buffers: shared hit=11
+ Planning Time: 0.019 ms
+ Trigger for constraint fk_parcels_registered_by: time=0.146 calls=1
+ Trigger for constraint fk_parcels_collected_by: time=0.005 calls=1
+ Execution Time: 0.616 ms
+(8 rows)
+
+ROLLBACK
+                                                                                                          QUERY PLAN                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=2461.01..2461.04 rows=11 width=215) (actual time=25.543..25.624 rows=4134.00 loops=1)
+   Sort Key: p.created_at DESC
+   Sort Method: quicksort  Memory: 978kB
+   Buffers: shared hit=1144
+   ->  Merge Join  (cost=2457.83..2460.82 rows=11 width=215) (actual time=24.472..24.895 rows=4134.00 loops=1)
+         Merge Cond: (rb.id = p.registered_by_id)
+         Buffers: shared hit=1141
+         ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.009..0.015 rows=48.00 loops=1)
+               Index Searches: 1
+               Buffers: shared hit=3
+         ->  Sort  (cost=2457.55..2457.58 rows=11 width=174) (actual time=24.459..24.539 rows=4134.00 loops=1)
+               Sort Key: p.registered_by_id
+               Sort Method: quicksort  Memory: 825kB
+               Buffers: shared hit=1138
+               ->  Merge Right Join  (cost=2454.85..2457.36 rows=11 width=174) (actual time=23.484..23.827 rows=4134.00 loops=1)
+                     Merge Cond: (cb.id = p.collected_by_id)
+                     Buffers: shared hit=1138
+                     ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.011..0.011 rows=1.00 loops=1)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Sort  (cost=2454.18..2454.21 rows=11 width=133) (actual time=23.467..23.554 rows=4134.00 loops=1)
+                           Sort Key: p.collected_by_id
+                           Sort Method: quicksort  Memory: 825kB
+                           Buffers: shared hit=1135
+                           ->  Bitmap Heap Scan on parcels p  (cost=383.37..2453.99 rows=11 width=133) (actual time=1.577..22.513 rows=4134.00 loops=1)
+                                 Recheck Cond: ((status)::text = 'PENDING'::text)
+                                 Filter: ((lower((tracking_id)::text) ~~ '%student 5%'::text) OR (lower((student_name)::text) ~~ '%student 5%'::text) OR (lower((student_registration_number)::text) ~~ '%student 5%'::text))
+                                 Rows Removed by Filter: 30866
+                                 Heap Blocks: exact=1106
+                                 Buffers: shared hit=1135
+                                 ->  Bitmap Index Scan on idx_parcels_status  (cost=0.00..383.37 rows=35077 width=0) (actual time=1.408..1.411 rows=35004.00 loops=1)
+                                       Index Cond: ((status)::text = 'PENDING'::text)
+                                       Index Searches: 1
+                                       Buffers: shared hit=29
+ Planning:
+   Buffers: shared hit=161
+ Planning Time: 0.846 ms
+ Execution Time: 25.753 ms
+(38 rows)
+
+                                                                                                                              QUERY PLAN                                                                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=183.65..183.66 rows=1 width=215) (actual time=0.053..0.053 rows=0.00 loops=1)
+   Sort Key: p.created_at DESC
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=62
+   ->  Merge Join  (cost=180.80..183.64 rows=1 width=215) (actual time=0.052..0.053 rows=0.00 loops=1)
+         Merge Cond: (rb.id = p.registered_by_id)
+         Buffers: shared hit=62
+         ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=1.00 loops=1)
+               Index Searches: 1
+               Buffers: shared hit=3
+         ->  Sort  (cost=180.52..180.53 rows=1 width=174) (actual time=0.050..0.050 rows=0.00 loops=1)
+               Sort Key: p.registered_by_id
+               Sort Method: quicksort  Memory: 25kB
+               Buffers: shared hit=59
+               ->  Merge Right Join  (cost=178.07..180.51 rows=1 width=174) (actual time=0.050..0.050 rows=0.00 loops=1)
+                     Merge Cond: (cb.id = p.collected_by_id)
+                     Buffers: shared hit=59
+                     ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=1.00 loops=1)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Sort  (cost=177.40..177.40 rows=1 width=133) (actual time=0.048..0.048 rows=0.00 loops=1)
+                           Sort Key: p.collected_by_id
+                           Sort Method: quicksort  Memory: 25kB
+                           Buffers: shared hit=56
+                           ->  Bitmap Heap Scan on parcels p  (cost=4.68..177.39 rows=1 width=133) (actual time=0.047..0.047 rows=0.00 loops=1)
+                                 Recheck Cond: ((student_registration_number)::text = 'REG000500'::text)
+                                 Filter: (((status)::text = 'PENDING'::text) AND ((lower((tracking_id)::text) ~~ '%student 5%'::text) OR (lower((student_name)::text) ~~ '%student 5%'::text) OR (lower((student_registration_number)::text) ~~ '%student 5%'::text)))
+                                 Rows Removed by Filter: 53
+                                 Heap Blocks: exact=54
+                                 Buffers: shared hit=56
+                                 ->  Bitmap Index Scan on idx_parcels_student_registration_number  (cost=0.00..4.68 rows=52 width=0) (actual time=0.012..0.012 rows=57.00 loops=1)
+                                       Index Cond: ((student_registration_number)::text = 'REG000500'::text)
+                                       Index Searches: 1
+                                       Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=6
+ Planning Time: 0.126 ms
+ Execution Time: 0.066 ms
+(38 rows)
+
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Merge Join  (cost=11.72..14.56 rows=1 width=223) (actual time=0.016..0.017 rows=1.00 loops=1)
+   Merge Cond: (rb.id = p.registered_by_id)
+   Buffers: shared hit=9
+   ->  Index Scan using users_pkey on users rb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.003 rows=2.00 loops=1)
+         Index Searches: 1
+         Buffers: shared hit=3
+   ->  Sort  (cost=11.45..11.45 rows=1 width=182) (actual time=0.013..0.013 rows=1.00 loops=1)
+         Sort Key: p.registered_by_id
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Merge Right Join  (cost=8.99..11.44 rows=1 width=182) (actual time=0.011..0.012 rows=1.00 loops=1)
+               Merge Cond: (cb.id = p.collected_by_id)
+               Buffers: shared hit=6
+               ->  Index Scan using users_pkey on users cb  (cost=0.28..54.27 rows=1000 width=45) (actual time=0.002..0.002 rows=1.00 loops=1)
+                     Index Searches: 1
+                     Buffers: shared hit=3
+               ->  Sort  (cost=8.32..8.32 rows=1 width=141) (actual time=0.009..0.009 rows=1.00 loops=1)
+                     Sort Key: p.collected_by_id
+                     Sort Method: quicksort  Memory: 25kB
+                     Buffers: shared hit=3
+                     ->  Index Scan using parcels_pkey on parcels p  (cost=0.29..8.31 rows=1 width=141) (actual time=0.008..0.008 rows=1.00 loops=1)
+                           Index Cond: (id = 500)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=9
+ Planning Time: 0.075 ms
+ Execution Time: 0.028 ms
+(28 rows)
+

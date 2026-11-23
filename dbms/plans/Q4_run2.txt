@@ -1,0 +1,12 @@
+(8 rows)
+
+                                                      QUERY PLAN                                                      
+----------------------------------------------------------------------------------------------------------------------
+ Index Scan using users_pkey on users  (cost=0.28..8.29 rows=1 width=55) (actual time=0.003..0.004 rows=1.00 loops=1)
+   Index Cond: (id = 500)
+   Index Searches: 1
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=5
+ Planning Time: 0.024 ms
+ Execution Time: 0.005 ms
