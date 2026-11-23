@@ -1,199 +1,119 @@
 -- =========================================================
--- Instagram Social Media Database
--- File: sql/01_schema.sql
+-- UniCrate University Parcel Management System
+-- File: dbms/03_schema.sql
 -- Purpose: Create the relational schema for the project
+--
+-- This is the relational form of backend/prisma/schema.prisma
+-- in the main UniCrate repo (users, parcels, Role and
+-- ParcelStatus). The live app stores the same data in
+-- MongoDB Atlas through Prisma.
+--
+-- Differences caused by moving from MongoDB to SQL:
+--   * Mongo's ObjectId (_id) becomes an integer identity column.
+--   * Prisma enums (Role, ParcelStatus) become VARCHAR + CHECK.
+--   * camelCase field names become snake_case column names.
 -- =========================================================
 
 -- Create and select the project schema
-CREATE SCHEMA IF NOT EXISTS instagram;
-SET search_path TO instagram;
+CREATE SCHEMA IF NOT EXISTS unicrate;
+SET search_path TO unicrate;
 
 -- 1. USERS
+-- Staff (ADMIN, EDITOR) and students (VIEWER) who can log in.
 CREATE TABLE users (
-    user_id INTEGER PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    full_name VARCHAR(150),
-    email VARCHAR(255) UNIQUE,
-    bio TEXT,
-    account_type VARCHAR(20) NOT NULL,
-    is_private BOOLEAN NOT NULL,
-    is_verified BOOLEAN NOT NULL,
-    followers_count INTEGER NOT NULL DEFAULT 0,
-    following_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL,
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,          -- bcrypt hash, never the plain password
+    registration_number VARCHAR(50),         -- required for VIEWER, optional for staff
+    role VARCHAR(10) NOT NULL DEFAULT 'VIEWER',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT chk_users_account_type
-        CHECK (account_type IN ('BUSINESS', 'CREATOR', 'PERSONAL')),
+    CONSTRAINT chk_users_role
+        CHECK (role IN ('ADMIN', 'EDITOR', 'VIEWER')),
 
-    CONSTRAINT chk_users_followers
-        CHECK (followers_count >= 0),
+    -- The app rejects a VIEWER account without a registration number
+    CONSTRAINT chk_users_viewer_reg_no
+        CHECK (role <> 'VIEWER' OR registration_number IS NOT NULL),
 
-    CONSTRAINT chk_users_following
-        CHECK (following_count >= 0)
+    -- The app trims and uppercases registration numbers before saving
+    CONSTRAINT chk_users_reg_no_format
+        CHECK (registration_number IS NULL
+               OR (registration_number <> ''
+                   AND registration_number = UPPER(BTRIM(registration_number)))),
+
+    -- Same pattern the app uses: /^\S+@\S+\.\S+$/
+    CONSTRAINT chk_users_email_format
+        CHECK (email ~ '^\S+@\S+\.\S+$')
 );
 
 
--- 2. FOLLOWS
-CREATE TABLE follows (
-    follower_id INTEGER NOT NULL,
-    followee_id INTEGER NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
+-- 2. PARCELS
+-- One row per parcel that arrives at the university.
+CREATE TABLE parcels (
+    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tracking_id VARCHAR(30) NOT NULL UNIQUE,   -- e.g. UC-20261119-A7F3K2
+    student_name VARCHAR(150) NOT NULL,
+    student_registration_number VARCHAR(50) NOT NULL,
+    student_email VARCHAR(255) NOT NULL,
+    courier_name VARCHAR(150) NOT NULL,
+    description TEXT,
+    arrival_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    collected_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    PRIMARY KEY (follower_id, followee_id),
+    -- Staff member who registered the parcel
+    registered_by_id INTEGER NOT NULL,
 
-    CONSTRAINT fk_follows_follower
-        FOREIGN KEY (follower_id) REFERENCES users(user_id),
+    -- Staff member who marked it collected (set by PATCH /:id/collect)
+    collected_by_id INTEGER,
 
-    CONSTRAINT fk_follows_followee
-        FOREIGN KEY (followee_id) REFERENCES users(user_id),
+    CONSTRAINT fk_parcels_registered_by
+        FOREIGN KEY (registered_by_id) REFERENCES users(id),
 
-    CONSTRAINT chk_follows_status
-        CHECK (status IN ('ACCEPTED', 'PENDING')),
+    CONSTRAINT fk_parcels_collected_by
+        FOREIGN KEY (collected_by_id) REFERENCES users(id),
 
-    CONSTRAINT chk_follows_not_self
-        CHECK (follower_id <> followee_id)
+    CONSTRAINT chk_parcels_status
+        CHECK (status IN ('PENDING', 'COLLECTED')),
+
+    -- A collected parcel always records when and by whom.
+    -- A pending parcel never has collection details.
+    CONSTRAINT chk_parcels_collection
+        CHECK (
+            (status = 'PENDING'
+                AND collected_at IS NULL
+                AND collected_by_id IS NULL)
+            OR
+            (status = 'COLLECTED'
+                AND collected_at IS NOT NULL
+                AND collected_by_id IS NOT NULL)
+        ),
+
+    -- The app trims and uppercases registration numbers before saving
+    CONSTRAINT chk_parcels_reg_no_format
+        CHECK (student_registration_number <> ''
+               AND student_registration_number = UPPER(BTRIM(student_registration_number))),
+
+    CONSTRAINT chk_parcels_email_format
+        CHECK (student_email ~ '^\S+@\S+\.\S+$')
 );
 
 
--- 3. HASHTAGS
-CREATE TABLE hashtags (
-    hashtag_id INTEGER PRIMARY KEY,
-    tag VARCHAR(255) NOT NULL UNIQUE
-);
+-- 3. INDEXES
+-- The same indexes as schema.prisma. The queries in 04_queries.sql rely on them.
+-- (users.email and parcels.tracking_id already get a unique index from UNIQUE.)
 
+-- Registration numbers are NOT unique in the database, because staff accounts
+-- have none. The app checks uniqueness for students instead (see Q3).
+CREATE INDEX idx_users_registration_number
+    ON users (registration_number);
 
--- 4. POSTS
-CREATE TABLE posts (
-    post_id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    post_type VARCHAR(20) NOT NULL,
-    caption TEXT,
-    location_name VARCHAR(255),
-    like_count INTEGER NOT NULL DEFAULT 0,
-    comment_count INTEGER NOT NULL DEFAULT 0,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL,
+CREATE INDEX idx_parcels_student_registration_number
+    ON parcels (student_registration_number);
 
-    CONSTRAINT fk_posts_user
-        FOREIGN KEY (user_id) REFERENCES users(user_id),
-
-    CONSTRAINT chk_posts_type
-        CHECK (post_type IN ('CAROUSEL', 'PHOTO', 'REEL', 'VIDEO')),
-
-    CONSTRAINT chk_posts_like_count
-        CHECK (like_count >= 0),
-
-    CONSTRAINT chk_posts_comment_count
-        CHECK (comment_count >= 0)
-);
-
-
--- 5. POST_HASHTAGS
-CREATE TABLE post_hashtags (
-    post_id INTEGER NOT NULL,
-    hashtag_id INTEGER NOT NULL,
-
-    PRIMARY KEY (post_id, hashtag_id),
-
-    CONSTRAINT fk_post_hashtags_post
-        FOREIGN KEY (post_id) REFERENCES posts(post_id),
-
-    CONSTRAINT fk_post_hashtags_hashtag
-        FOREIGN KEY (hashtag_id) REFERENCES hashtags(hashtag_id)
-);
-
-
--- 6. POST_MEDIA
-CREATE TABLE post_media (
-    post_id INTEGER NOT NULL,
-    position INTEGER NOT NULL,
-    media_type VARCHAR(20) NOT NULL,
-    media_url TEXT NOT NULL,
-    width INTEGER,
-    height INTEGER,
-    duration_sec NUMERIC(10,2),
-
-    PRIMARY KEY (post_id, position),
-
-    CONSTRAINT fk_post_media_post
-        FOREIGN KEY (post_id) REFERENCES posts(post_id),
-
-    CONSTRAINT chk_post_media_type
-        CHECK (media_type IN ('IMAGE', 'VIDEO')),
-
-    CONSTRAINT chk_post_media_position
-        CHECK (position > 0),
-
-    CONSTRAINT chk_post_media_width
-        CHECK (width IS NULL OR width > 0),
-
-    CONSTRAINT chk_post_media_height
-        CHECK (height IS NULL OR height > 0),
-
-    CONSTRAINT chk_post_media_duration
-        CHECK (duration_sec IS NULL OR duration_sec >= 0)
-);
-
-
--- 7. LIKES
-CREATE TABLE likes (
-    user_id INTEGER NOT NULL,
-    post_id INTEGER NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-
-    PRIMARY KEY (user_id, post_id),
-
-    CONSTRAINT fk_likes_user
-        FOREIGN KEY (user_id) REFERENCES users(user_id),
-
-    CONSTRAINT fk_likes_post
-        FOREIGN KEY (post_id) REFERENCES posts(post_id)
-);
-
-
--- 8. COMMENTS
-CREATE TABLE comments (
-    comment_id INTEGER PRIMARY KEY,
-    post_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    parent_comment_id INTEGER,
-    body TEXT NOT NULL,
-    is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL,
-
-    CONSTRAINT fk_comments_post
-        FOREIGN KEY (post_id) REFERENCES posts(post_id),
-
-    CONSTRAINT fk_comments_user
-        FOREIGN KEY (user_id) REFERENCES users(user_id),
-
-    CONSTRAINT fk_comments_parent
-        FOREIGN KEY (parent_comment_id) REFERENCES comments(comment_id),
-
-    CONSTRAINT chk_comments_not_self_parent
-        CHECK (parent_comment_id IS NULL OR parent_comment_id <> comment_id)
-);
-
-
--- 9. STORIES
-CREATE TABLE stories (
-    story_id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    media_type VARCHAR(20) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    view_count INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT fk_stories_user
-        FOREIGN KEY (user_id) REFERENCES users(user_id),
-
-    CONSTRAINT chk_stories_media_type
-        CHECK (media_type IN ('IMAGE', 'VIDEO')),
-
-    CONSTRAINT chk_stories_view_count
-        CHECK (view_count >= 0),
-
-    CONSTRAINT chk_stories_expiry
-        CHECK (expires_at > created_at)
-);
+CREATE INDEX idx_parcels_status
+    ON parcels (status);
